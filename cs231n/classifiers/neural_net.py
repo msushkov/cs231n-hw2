@@ -59,10 +59,10 @@ def two_layer_net(X, model, y=None, reg=0.0):
   - reg: Regularization strength.
 
   Returns:
-  If y not is passed, return a matrix scores of shape (N, C) where scores[i, c]
+  If y is not passed, return a matrix scores of shape (N, C) where scores[i, c]
   is the score for class c on input X[i].
 
-  If y is not passed, instead return a tuple of:
+  If y is passed, instead return a tuple of:
   - loss: Loss (data loss and regularization loss) for this batch of training
     samples.
   - grads: Dictionary mapping parameter names to gradients of those parameters
@@ -72,6 +72,8 @@ def two_layer_net(X, model, y=None, reg=0.0):
   # unpack variables from the model dictionary
   W1,b1,W2,b2 = model['W1'], model['b1'], model['W2'], model['b2']
   N, D = X.shape
+  D, H = W1.shape
+  H, C = W2.shape
 
   # compute the forward pass
   scores = None
@@ -80,7 +82,16 @@ def two_layer_net(X, model, y=None, reg=0.0):
   # Store the result in the scores variable, which should be an array of      #
   # shape (N, C).                                                             #
   #############################################################################
-  pass
+  
+  h1 = np.dot(X, W1) + b1
+
+  # apply ReLU to h1
+  h2 = np.maximum(h1, 0)
+
+  h3 = np.dot(h2, W2) + b2
+
+  scores = h3
+
   #############################################################################
   #                              END OF YOUR CODE                             #
   #############################################################################
@@ -91,6 +102,7 @@ def two_layer_net(X, model, y=None, reg=0.0):
 
   # compute the loss
   loss = None
+
   #############################################################################
   # TODO: Finish the forward pass, and compute the loss. This should include  #
   # both the data loss and L2 regularization for W1 and W2. Store the result  #
@@ -98,7 +110,27 @@ def two_layer_net(X, model, y=None, reg=0.0):
   # classifier loss. So that your results match ours, multiply the            #
   # regularization loss by 0.5                                                #
   #############################################################################
-  pass
+  
+  scores = np.exp(h3)
+  row_sums = np.sum(scores, axis=1) # vector of size N of sum over exps of all classes
+
+  # y_mat will be a matrix of all 0's except y_mat[i, j] = 1 where i is a given data point
+  # and j is the correct class for it
+  y_mat = np.zeros(shape=scores.shape)
+  y_mat[range(N), y] = 1
+
+  correct_fy_all_zeros = np.multiply(y_mat, h3)
+  fy = np.sum(correct_fy_all_zeros, axis=1) # sum over each row
+
+  # vector of losses for all N datapoints
+  loss_vector = np.log(row_sums) - fy
+
+  loss = np.average(loss_vector)
+
+  # Add regularization to the loss.
+  loss += 0.5 * reg * np.sum(W1 * W1)
+  loss += 0.5 * reg * np.sum(W2 * W2)
+
   #############################################################################
   #                              END OF YOUR CODE                             #
   #############################################################################
@@ -110,7 +142,43 @@ def two_layer_net(X, model, y=None, reg=0.0):
   # and biases. Store the results in the grads dictionary. For example,       #
   # grads['W1'] should store the gradient on W1, and be a matrix of same size #
   #############################################################################
-  pass
+
+  # want dL/dW2
+  dLdh3 = scores / row_sums[:, np.newaxis] # N x C
+  assert dLdh3.shape == (N, C)
+
+  dLdh3 -= y_mat
+
+  dW2 = np.dot(h2.T, dLdh3) / float(N)
+
+  # want dL/db2 = dL/dh3 * dh3/db2
+  dh3db2 = np.ones((1, N))
+
+  db2 = np.dot(dh3db2, dLdh3) / float(N)
+
+  # want dL/dW1
+  dLdh2 = np.dot(dLdh3, W2.T)
+
+  # the indicator I(h1 >= 0)
+  dReLU = h1.copy()
+  dReLU[dReLU >= 0] = 1
+  dReLU[dReLU < 0] = 0
+
+  dLdh1 = dLdh2 * dReLU
+  dW1 = np.dot(X.T, dLdh1) / float(N)
+
+  # want dL/db1
+  db1 = np.dot(np.ones((1, N)), dLdh1) / float(N)
+
+  # Add regularization to the gradient
+  dW2 += reg * W2
+  dW1 += reg * W1
+
+  grads['W2'] = dW2
+  grads['b2'] = db2
+  grads['W1'] = dW1
+  grads['b1'] = db1
+
   #############################################################################
   #                              END OF YOUR CODE                             #
   #############################################################################

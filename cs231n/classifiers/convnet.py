@@ -217,9 +217,9 @@ def init_three_layer_convnet(weight_scale=1e-3, bias_scale=0, input_shape=(3, 32
   model = {}
   model['W1'] = weight_scale * np.random.randn(num_filters, C, filter_size, filter_size)
   model['b1'] = bias_scale * np.random.randn(num_filters)
-  model['W2'] = weight_scale * np.random.randn(num_filters, C, filter_size, filter_size)
+  model['W2'] = weight_scale * np.random.randn(num_filters, 8 * C, filter_size, filter_size)
   model['b2'] = bias_scale * np.random.randn(num_filters)
-  model['W3'] = weight_scale * np.random.randn(num_filters * H * W / 4, num_classes)
+  model['W3'] = weight_scale * np.random.randn(num_filters * H * W / 16, num_classes)
   model['b3'] = bias_scale * np.random.randn(num_classes)
   return model
 

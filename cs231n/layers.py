@@ -117,7 +117,7 @@ def relu_backward(dout, cache):
   # TODO: Implement the ReLU backward pass.                                   #
   #############################################################################
   
-  # want dReLU/dx; already have d(next layer)/dReLU (this is dout)
+  # want dReLU/dx * d(next layer)/dReLU (this is dout)
   # dReLU(x)/dx is I(x >= 0)
   dReLU = x.copy()
   dReLU[dReLU >= 0] = 1
@@ -244,35 +244,51 @@ def conv_backward_naive(dout, cache):
 
   # dout shape is (N, F, Hprime, Wprime)
 
+  assert dout.shape == (N, F, Hprime, Wprime)
+
   # dx shape is (N, C, H, W)
   # dw shape is (F, C, HH, WW)
   # db shape is (F,)
 
-  dx = np.empty(x.shape)
-  dw = np.empty(w.shape)
-  db = np.empty(b.shape)
+  dw = np.zeros(w.shape)
+  db = np.zeros(b.shape)
 
   # pad x
   x_padded = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), 'constant')
 
+  dx_padded = np.zeros(x_padded.shape)
+
   for i in xrange(N):
-    for f in xrange(F):
-      W = w[f]
+    for c in xrange(C):
+      # X is shape (H, W)
+      X = x_padded[i, c]
+      
+      for f in xrange(F):
+        # W is shape (HH, WW)
+        W = w[f, c]
 
-      # W is shape (C, HH, WW)
+        # indices in the output volume
+        for r1 in xrange(Hprime):
+          # indices in the input X
+          r1_start = r1 * stride
+          r1_end = r1_start + HH
 
-      result = np.empty((Hprime, Wprime))
+          for r2 in xrange(Wprime):
+            # indices in the input X
+            r2_start = r2 * stride
+            r2_end = r2_start + WW
 
-      for r in xrange(Hprime):
-        for c in xrange(Wprime):
-          r_start = r * stride
-          r_end = r_start + HH
+            x_curr = X[r1_start:r1_end, r2_start:r2_end].copy()
 
-          c_start = c * stride
-          c_end = c_start + WW
+            dx_padded[i, c, r1_start:r1_end, r2_start:r2_end] += W * dout[i, f, r1, r2]
 
-          dx[i, :, r_start:r_end, c_start:c_end] = np.sum(W) * dout[i, f, r, c]
+            dw[f, c, 0:HH, 0:WW] += x_curr * dout[i, f, r1, r2]
 
+            db[f] += dout[i, f, r1, r2] # doing this C too many times
+
+  dx = dx_padded[:, :, pad:-pad, pad:-pad]
+
+  db /= C
 
   #############################################################################
   #                             END OF YOUR CODE                              #
@@ -376,6 +392,9 @@ def max_pool_backward_naive(dout, cache):
 
       # X is of shape (H, W)
 
+      global_offset_r1 = 0
+      global_offset_r2 = 0
+
       for r1 in xrange(Hprime):
         for r2 in xrange(Wprime):
           r1_start = r1 * stride
@@ -388,10 +407,10 @@ def max_pool_backward_naive(dout, cache):
           curr_max = np.max(x_curr)
 
           # indicator on x_curr
+          x_curr[x_curr != curr_max] = 0
           x_curr[x_curr == curr_max] = 1
-          x_curr[x_curr < curr_max] = 0
 
-          dx[i, c, r1_start:r1_end, r2_start:r2_end] += x_curr * dout[i, c, r1, r2]
+          dx[i, c, r1_start:r1_end, r2_start:r2_end] += dout[i, c, r1, r2] * x_curr
 
   #############################################################################
   #                             END OF YOUR CODE                              #

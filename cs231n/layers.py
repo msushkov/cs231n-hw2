@@ -22,7 +22,13 @@ def affine_forward(x, w, b):
   # TODO: Implement the affine forward pass. Store the result in out. You     #
   # will need to reshape the input into rows.                                 #
   #############################################################################
-  pass
+  
+  # D = product of all di's
+  D = np.prod(x.shape[1:])
+  X = x.reshape((x.shape[0], D))
+
+  out = np.dot(X, w) + b
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -50,7 +56,19 @@ def affine_backward(dout, cache):
   #############################################################################
   # TODO: Implement the affine backward pass.                                 #
   #############################################################################
-  pass
+  
+  N = x.shape[0]
+
+  # D = product of all di's
+  D = np.prod(x.shape[1:])
+  X = x.reshape((N, D))
+
+  dx = np.dot(dout, w.T).reshape(x.shape)
+
+  db = np.dot(np.ones((1, N)), dout).reshape(b.shape)
+
+  dw = np.dot(X.T, dout)
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -72,7 +90,10 @@ def relu_forward(x):
   #############################################################################
   # TODO: Implement the ReLU forward pass.                                    #
   #############################################################################
-  pass
+  
+  # ReLU(x) is max(0, x)
+  out = np.maximum(x, 0)
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -95,7 +116,14 @@ def relu_backward(dout, cache):
   #############################################################################
   # TODO: Implement the ReLU backward pass.                                   #
   #############################################################################
-  pass
+  
+  # want dReLU/dx; already have d(next layer)/dReLU (this is dout)
+  # dReLU(x)/dx is I(x >= 0)
+  dReLU = x.copy()
+  dReLU[dReLU >= 0] = 1
+  dReLU[dReLU < 0] = 0
+  dx = np.multiply(dout, dReLU)
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -108,7 +136,7 @@ def conv_forward_naive(x, w, b, conv_param):
 
   The input consists of N data points, each with C channels, height H and width
   W. We convolve each input with F different filters, where each filter spans
-  all C channels and has height HH and width HH.
+  all C channels and has height HH and width WW.
 
   Input:
   - x: Input data of shape (N, C, H, W)
@@ -130,7 +158,55 @@ def conv_forward_naive(x, w, b, conv_param):
   # TODO: Implement the convolutional forward pass.                           #
   # Hint: you can use the function np.pad for padding.                        #
   #############################################################################
-  pass
+  
+  N, C, H, W = x.shape
+  F, C, HH, WW = w.shape
+  pad = conv_param['pad']
+  stride = conv_param['stride']
+
+  Hprime = 1 + (H + 2 * pad - HH) / stride
+  Wprime = 1 + (W + 2 * pad - WW) / stride
+
+  assert Hprime == int(Hprime)
+  assert Wprime == int(Wprime)
+
+  out = np.empty((N, F, Hprime, Wprime))
+
+  # for each image
+  for i in xrange(N):
+    # get the current image and pad it with 0's
+    X = np.pad(x[i], ((0, 0), (pad, pad), (pad, pad)), 'constant')
+
+    # X is of shape (C, H + 2pad, W + 2pad)
+
+    # for each filter
+    for f in xrange(F):
+      W = w[f]
+      b_curr = b[f]
+
+      # W is of shape (C, HH, WW)
+      # b_curr is a constant
+
+      result = np.empty((Hprime, Wprime))
+
+      for r in xrange(Hprime):
+        for c in xrange(Wprime):
+          r_start = r * stride
+          r_end = r_start + HH
+
+          c_start = c * stride
+          c_end = c_start + WW
+
+          x_curr = X[:, r_start:r_end, c_start:c_end]
+
+          # x_curr is of shape (C, HH, WW)
+
+          result[r, c] = np.sum(np.multiply(x_curr, W)) + b_curr
+
+      # result is of shape (Hprime, Wprime)
+
+      out[i, f] = result
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -155,7 +231,49 @@ def conv_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the convolutional backward pass.                          #
   #############################################################################
-  pass
+  
+  (x, w, b, conv_param) = cache
+
+  N, C, H, W = x.shape
+  F, C, HH, WW = w.shape
+  pad = conv_param['pad']
+  stride = conv_param['stride']
+
+  Hprime = 1 + (H + 2 * pad - HH) / stride
+  Wprime = 1 + (W + 2 * pad - WW) / stride
+
+  # dout shape is (N, F, Hprime, Wprime)
+
+  # dx shape is (N, C, H, W)
+  # dw shape is (F, C, HH, WW)
+  # db shape is (F,)
+
+  dx = np.empty(x.shape)
+  dw = np.empty(w.shape)
+  db = np.empty(b.shape)
+
+  # pad x
+  x_padded = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), 'constant')
+
+  for i in xrange(N):
+    for f in xrange(F):
+      W = w[f]
+
+      # W is shape (C, HH, WW)
+
+      result = np.empty((Hprime, Wprime))
+
+      for r in xrange(Hprime):
+        for c in xrange(Wprime):
+          r_start = r * stride
+          r_end = r_start + HH
+
+          c_start = c * stride
+          c_end = c_start + WW
+
+          dx[i, :, r_start:r_end, c_start:c_end] = np.sum(W) * dout[i, f, r, c]
+
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -181,7 +299,37 @@ def max_pool_forward_naive(x, pool_param):
   #############################################################################
   # TODO: Implement the max pooling forward pass                              #
   #############################################################################
-  pass
+  
+  N, C, H, W = x.shape
+
+  ht = pool_param['pool_height']
+  wd = pool_param['pool_width']
+  stride = pool_param['stride']
+
+  Hprime = 1 + (H - ht) / stride
+  Wprime = 1 + (W - wd) / stride
+
+  out = np.empty((N, C, Hprime, Wprime))
+
+  for i in xrange(N):
+    for c in xrange(C):
+      # get the current image
+      X = x[i, c]
+
+      # X is of shape (H, W)
+
+      for r1 in xrange(Hprime):
+        for r2 in xrange(Wprime):
+          r1_start = r1 * stride
+          r1_end = r1_start + ht
+
+          r2_start = r2 * stride
+          r2_end = r2_start + wd
+
+          x_curr = X[r1_start:r1_end, r2_start:r2_end]
+
+          out[i, c, r1, r2] = np.max(x_curr)
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -204,7 +352,47 @@ def max_pool_backward_naive(dout, cache):
   #############################################################################
   # TODO: Implement the max pooling backward pass                             #
   #############################################################################
-  pass
+  
+  (x, pool_param) = cache
+
+  N, C, H, W = x.shape
+
+  ht = pool_param['pool_height']
+  wd = pool_param['pool_width']
+  stride = pool_param['stride']
+
+  Hprime = 1 + (H - ht) / stride
+  Wprime = 1 + (W - wd) / stride
+
+  # dx has shape (N, C, H, W)
+  # dout has shape (N, C, Hprime, Wprime)
+
+  dx = np.zeros(x.shape)
+
+  for i in xrange(N):
+    for c in xrange(C):
+      # get the current image
+      X = x[i, c]
+
+      # X is of shape (H, W)
+
+      for r1 in xrange(Hprime):
+        for r2 in xrange(Wprime):
+          r1_start = r1 * stride
+          r1_end = r1_start + ht
+
+          r2_start = r2 * stride
+          r2_end = r2_start + wd
+
+          x_curr = X[r1_start:r1_end, r2_start:r2_end].copy()
+          curr_max = np.max(x_curr)
+
+          # indicator on x_curr
+          x_curr[x_curr == curr_max] = 1
+          x_curr[x_curr < curr_max] = 0
+
+          dx[i, c, r1_start:r1_end, r2_start:r2_end] += x_curr * dout[i, c, r1, r2]
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################

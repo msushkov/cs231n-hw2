@@ -187,7 +187,7 @@ def three_layer_convnet(X, model, y=None, reg=0.0):
 
 
 def init_three_layer_convnet(weight_scale=1e-3, bias_scale=0, input_shape=(3, 32, 32),
-                             num_classes=10, num_filters=32, filter_size=5):
+                             num_classes=10, num_filters_layer1=32, num_filters_layer2=64, filter_size=5):
   """
   Initialize the weights for a ConvNet of this architecture:
     [conv-relu-pool]x2 - [affine]x1 - [softmax]
@@ -215,11 +215,11 @@ def init_three_layer_convnet(weight_scale=1e-3, bias_scale=0, input_shape=(3, 32
   assert filter_size % 2 == 1, 'Filter size must be odd; got %d' % filter_size
 
   model = {}
-  model['W1'] = weight_scale * np.random.randn(num_filters, C, filter_size, filter_size)
-  model['b1'] = bias_scale * np.random.randn(num_filters)
-  model['W2'] = weight_scale * np.random.randn(num_filters, 8 * C, filter_size, filter_size)
-  model['b2'] = bias_scale * np.random.randn(num_filters)
-  model['W3'] = weight_scale * np.random.randn(num_filters * H * W / 16, num_classes)
+  model['W1'] = weight_scale * np.random.randn(num_filters_layer1, C, filter_size, filter_size)
+  model['b1'] = bias_scale * np.random.randn(num_filters_layer1)
+  model['W2'] = weight_scale * np.random.randn(num_filters_layer2, num_filters_layer1, filter_size, filter_size)
+  model['b2'] = bias_scale * np.random.randn(num_filters_layer2)
+  model['W3'] = weight_scale * np.random.randn(num_filters_layer2 * H * W / 16, num_classes)
   model['b3'] = bias_scale * np.random.randn(num_classes)
   return model
 

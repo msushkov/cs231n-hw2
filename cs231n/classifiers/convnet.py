@@ -72,7 +72,7 @@ def two_layer_convnet(X, model, y=None, reg=0.0):
   return loss, grads
 
 
-def init_two_layer_convnet(weight_scale=5e-2, bias_scale=0, input_shape=(3, 32, 32),
+def init_two_layer_convnet(weight_scale=1e-3, bias_scale=0, input_shape=(3, 32, 32),
                            num_classes=10, num_filters=32, filter_size=5):
   """
   Initialize the weights for a two-layer ConvNet.
